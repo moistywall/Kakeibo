@@ -77,14 +77,3 @@ async fn main() {
 async fn root() -> Html<&'static str> {
     Html("<h1>Web家計簿解析アプリ</h1>")
 }
-
-#[derive(Deserialize)]   
-struct CreateUser {
-    username: String,
-}
-
-#[derive(Serialize)]
-struct User {
-    id: i64,
-    username: String,
-}
