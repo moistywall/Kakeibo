@@ -7,13 +7,11 @@ use axum::{
     extract::{Extension, MatchedPath},
     http::{HeaderMap, Request},
     response::{Html, Response},
-    routing::{get, post}, Router,
+    routing::{get, post},
+    Router,
 };
 use handlers::create_item;
-use std::{
-    sync::Arc,
-    time::Duration,
-};
+use std::{sync::Arc, time::Duration};
 use tokio::net::TcpListener;
 use tower_http::{classify::ServerErrorsFailureClass, trace::TraceLayer};
 use tracing::{info, info_span, Span};
@@ -40,7 +38,6 @@ async fn main() {
     tracing::debug!("listening on {}", listener.local_addr().unwrap());
     axum::serve(listener, app).await.unwrap();
 }
-
 
 async fn root() -> Html<&'static str> {
     Html("<h1>Web家計簿解析アプリ</h1>")
