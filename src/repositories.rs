@@ -1,10 +1,11 @@
 use std::{
     collections::HashMap,
-    sync::{Arc, RwLock},
+    sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard},
 };
 
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
+use anyhow::Context;
 
 // 書き方要確認
 #[derive(Debug, Error)]
@@ -73,23 +74,41 @@ impl ItemRepositoryForMemory {
             store: Arc::default(),
         }
     }
+
+    fn write_store_ref(&self) -> RwLockWriteGuard<ItemDatas> {
+        self.store.write().unwrap()
+    }
+
+    fn read_store_ref(&self) -> RwLockReadGuard<ItemDatas> {
+        self.store.read().unwrap()
+    }
 }
 
 impl ItemRepository for ItemRepositoryForMemory {
     fn create(&self, payload: CreateItem) -> Item {
-        todo!()
+        let mut store = self.write_store_ref();
+        let id = (store.len() + 1) as i32;
+        // 書き方要件等
+        let item = Item::new(id, payload.name.clone(), payload.price.clone(), payload.date.clone(), payload.store_name.clone());
+        store.insert(id, item.clone());
+        item
     }
 
     fn find(&self, id: i32) -> Option<Item> {
-        todo!()
+        let store = self.read_store_ref();
+        store.get(&id).map(|item| item.clone())
     }
 
     fn all(&self) -> Vec<Item> {
-        todo!()
+        let store = self.read_store_ref();
+        Vec::from_iter(store.values().map(|todo| todo.clone()))
     }
 
     fn update(&self, id: i32, payload: UpdateItem) -> anyhow::Result<Item> {
-        todo!()
+        let mut store = self.write_store_ref();
+        let todo = store
+            .get(&id)
+            .context(RepositoryError::NotFound(id))?;
     }
 
     fn delete(&self, id: i32) -> anyhow::Result<()> {
