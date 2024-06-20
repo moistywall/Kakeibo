@@ -106,9 +106,22 @@ impl ItemRepository for ItemRepositoryForMemory {
 
     fn update(&self, id: i32, payload: UpdateItem) -> anyhow::Result<Item> {
         let mut store = self.write_store_ref();
-        let todo = store
+        let item = store
             .get(&id)
             .context(RepositoryError::NotFound(id))?;
+        let name = payload.name.unwrap_or(item.name.clone());
+        let price = payload.price.unwrap_or(item.price.clone());
+        let date = payload.date.unwrap_or(item.date.clone());
+        let store_name = payload.store_name.unwrap_or(item.store_name.clone());
+        let item = Item {
+            id,
+            name,
+            price,
+            date,
+            store_name,
+        };
+        store.insert(id, item.clone());
+        Ok(item)
     }
 
     fn delete(&self, id: i32) -> anyhow::Result<()> {
