@@ -19,8 +19,24 @@ pub async fn find_item<T: ItemRepository>(
     Ok(StatusCode::OK)  // 暫定OK
 }
 
+pub async fn all_item<T: ItemRepository>(
+    Extension(repository): Extension<Arc<T>>,
+) -> impl IntoResponse {
+    todo!();        // 暫定OK
+}
+
 pub async fn update_item<T: ItemRepository>(
     Path(id): Path<i32>,
-    Json(payload): Json<UpdateItem>),
+    Json(payload): Json<UpdateItem>,
     Extension(repositoriry): Extension<Arc<T>>,
-) 
+) -> Result<impl IntoResponse, StatusCode> {
+    todo!();
+    Ok(StatusCode::OK)      // 暫定OK
+}
+
+pub async fn delete_item<T: ItemRepository>(
+    Path(id): Path<i32>,
+    Extension(repository): Extension<Arc<T>>,
+) -> StatusCode {
+    todo!();
+}
