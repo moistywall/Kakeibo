@@ -84,24 +84,24 @@ fn create_app<T: ItemRepository>(item: T) -> Router {
         )
 }
 
-// #[cfg(test)]
-// mod test {
-//     use super::*;
-//     use axum::{
-//         body::Body,
-//         http::{header, Method, Request}, RequestPartsExt,
-//     };
-//     use tower::{Service, ServiceExt};
+#[cfg(test)]
+mod test {
+    use super::*;
+    use axum::{
+        body::Body,
+        http::{header, Method, Request}, RequestPartsExt,
+    };
+    use tower::{Service, ServiceExt};
 
-//     // // todo : エラーチェック
-//     // #[tokio::test]
-//     // async fn should_return_hello_world() {
-//     //     let repository = ItemRepositoryForMemory::new();
-//     //     let req = Request::builder().uri("/").body(Body::empty()).unwrap();
-//     //     let res = create_app(repository).oneshot(req).await.unwrap();
+    // todo : エラーチェック
+    #[tokio::test]
+    async fn should_return_hello_world() {
+        let repository = ItemRepositoryForMemory::new();
+        let req = Request::builder().uri("/").body(Body::empty()).unwrap();
+        let res = create_app(repository).oneshot(req).await.unwrap();
 
-//     //     let bytes = hyper::body::to_bytes(res.into_body()).await.unwrap();
-//     //     let body: String = String::from_utf8(bytes.to_vec()).unwrap();
-//     //     assert!(body, "<h1>Web家計簿解析アプリ</h1>");
-//     // }
-// }
+        let bytes = axum::body::to_bytes(res.into_body(), usize::MAX).await.unwrap();
+        let body: String = String::from_utf8(bytes.to_vec()).unwrap();
+        assert_eq!(body, "<h1>Web家計簿解析アプリ</h1>");
+    }
+}

@@ -5,7 +5,7 @@ use std::{
 
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
-use anyhow::Context;
+use anyhow::{Context, Ok};
 
 // 書き方要確認
 #[derive(Debug, Error)]
@@ -125,6 +125,8 @@ impl ItemRepository for ItemRepositoryForMemory {
     }
 
     fn delete(&self, id: i32) -> anyhow::Result<()> {
-        todo!()
+        let mut store = self.write_store_ref();
+        store.remove(&id).ok_or(RepositoryError::NotFound(id))?;
+        Ok(())
     }
 }
