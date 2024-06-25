@@ -10,7 +10,7 @@ use axum::{
     routing::{get, post},
     Router,
 };
-use handlers::create_item;
+use handlers::{all_item, create_item, delete_item, find_item, update_item};
 use std::{sync::Arc, time::Duration};
 use tokio::net::TcpListener;
 use tower_http::{classify::ServerErrorsFailureClass, trace::TraceLayer};
@@ -46,8 +46,14 @@ async fn root() -> Html<&'static str> {
 fn create_app<T: ItemRepository>(item: T) -> Router {
     Router::new()
         .route("/", get(root))
-        // .route("/items", post((StatusCode::CREATED, Json(item2))))
         .route("/items", post(create_item::<T>))
+        .route("/items", post(create_item::<T>).get(all_item::<T>))
+        .route(
+            "/item:id",
+            get(find_item::<T>)
+                .delete(delete_item::<T>)
+                .patch(update_item::<T>),
+        )
         .layer(Extension(Arc::new(item)))
         .layer(
             TraceLayer::new_for_http()
@@ -87,11 +93,24 @@ fn create_app<T: ItemRepository>(item: T) -> Router {
 #[cfg(test)]
 mod test {
     use super::*;
+    use crate::repositories::{CreateItem, Item};
     use axum::{
         body::Body,
-        http::{header, Method, Request}, RequestPartsExt,
+        http::{header, Method, Request, StatusCode},
+        response::Response,
     };
-    use tower::{Service, ServiceExt};
+    use tower::ServiceExt;
+
+    fn build_item_with_empty(method: Method, path: &str,) -> Request<Body> {
+        Request::builder()
+            .uri(path)
+            .method(method)
+            .header(header::CONTENT_TYPE, mime::APPLICATION_JSON.as_ref())
+            .body(Body::from(json_body))
+            .unwrap()
+    }
+
+    
 
     // todo : エラーチェック
     #[tokio::test]
@@ -100,7 +119,9 @@ mod test {
         let req = Request::builder().uri("/").body(Body::empty()).unwrap();
         let res = create_app(repository).oneshot(req).await.unwrap();
 
-        let bytes = axum::body::to_bytes(res.into_body(), usize::MAX).await.unwrap();
+        let bytes = axum::body::to_bytes(res.into_body(), usize::MAX)
+            .await
+            .unwrap();
         let body: String = String::from_utf8(bytes.to_vec()).unwrap();
         assert_eq!(body, "<h1>Web家計簿解析アプリ</h1>");
     }
