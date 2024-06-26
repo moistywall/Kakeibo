@@ -97,11 +97,11 @@ mod test {
     use axum::{
         body::Body,
         http::{header, Method, Request, StatusCode},
-        response::Response,
+        response::Response, Json,
     };
     use tower::ServiceExt;
 
-    fn build_item_with_empty(method: Method, path: &str,) -> Request<Body> {
+    fn build_item_req_with_json(method: Method, path: &str, json_body: String) -> Request<Body> {
         Request::builder()
             .uri(path)
             .method(method)
@@ -110,7 +110,20 @@ mod test {
             .unwrap()
     }
 
-    
+    fn build_item_req_with_empty(method: Method, path: &str) -> Request<Body> {
+        Request::builder()
+            .uri(path)
+            .method(method)
+            .body(Body::empty())
+            .unwrap()
+    }
+
+    async fn res_to_item(res: Response) -> Item {
+        let bytes =axum::body::to_bytes(res.into_body(), usize::MAX).await.unwrap();
+        let body: String = String::from_utf8(bytes.to_vec()).unwrap();
+        let item: Item = serde_json::from_str(&body).expect(&format!("cannot convert Item instance. body: {}", body));
+        item
+    }
 
     // todo : エラーチェック
     #[tokio::test]
