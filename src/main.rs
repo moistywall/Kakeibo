@@ -46,10 +46,9 @@ async fn root() -> Html<&'static str> {
 fn create_app<T: ItemRepository>(item: T) -> Router {
     Router::new()
         .route("/", get(root))
-        .route("/items", post(create_item::<T>))
         .route("/items", post(create_item::<T>).get(all_item::<T>))
         .route(
-            "/item:id",
+            "/items:id",
             get(find_item::<T>)
                 .delete(delete_item::<T>)
                 .patch(update_item::<T>),
@@ -97,11 +96,12 @@ mod test {
     use axum::{
         body::Body,
         http::{header, Method, Request, StatusCode},
-        response::Response, Json,
+        response::Response,
+        Json,
     };
     use tower::ServiceExt;
 
-    fn build_item_req_with_json(method: Method, path: &str, json_body: String) -> Request<Body> {
+    fn build_item_req_with_json(path: &str, method: Method, json_body: String) -> Request<Body> {
         Request::builder()
             .uri(path)
             .method(method)
@@ -119,23 +119,38 @@ mod test {
     }
 
     async fn res_to_item(res: Response) -> Item {
-        let bytes =axum::body::to_bytes(res.into_body(), usize::MAX).await.unwrap();
-        let body: String = String::from_utf8(bytes.to_vec()).unwrap();
-        let item: Item = serde_json::from_str(&body).expect(&format!("cannot convert Item instance. body: {}", body));
-        item
-    }
-
-    // todo : エラーチェック
-    #[tokio::test]
-    async fn should_return_hello_world() {
-        let repository = ItemRepositoryForMemory::new();
-        let req = Request::builder().uri("/").body(Body::empty()).unwrap();
-        let res = create_app(repository).oneshot(req).await.unwrap();
-
         let bytes = axum::body::to_bytes(res.into_body(), usize::MAX)
             .await
             .unwrap();
         let body: String = String::from_utf8(bytes.to_vec()).unwrap();
-        assert_eq!(body, "<h1>Web家計簿解析アプリ</h1>");
+        // 以下の処理でserde_json::from_str()の後，3つ目の"124"をi32に変える必要がある．
+        let item: Item = serde_json::from_str(&body)
+            .expect(&format!("cannot convert Item instance. body: {}", body));
+        item
+    }
+
+    #[tokio::test]
+    async fn should_create_item() {
+        let expected = Item::new(
+            1,
+            "牛乳".to_string(),
+            124,
+            "2024-06-27".to_string(),
+            "ベルクス".to_string(),
+        );
+        let repository = ItemRepositoryForMemory::new();
+        let req = build_item_req_with_json(
+            "/items",
+            Method::POST,
+            r#"{ 
+                "name": "牛乳",
+                "price": "124",
+                "date": "2024-06-27",
+                "store": "ベルクス",
+            }"#.to_string(),
+        );
+        let res = create_app(repository).oneshot(req).await.unwrap();
+        let item = res_to_item(res).await;
+        assert_eq!(expected, item);
     }
 }
