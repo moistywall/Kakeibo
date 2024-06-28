@@ -40,6 +40,13 @@ pub struct CreateItem {
     store_name: String,
 }
 
+#[cfg(test)]
+impl CreateItem {
+    pub fn new(name: String, price: i32, date: String, store_name: String) -> Self {
+        Self{ name, price, date, store_name }
+    }
+}
+
 // 一部の情報のみが渡されることを想定し，id以外の値はOption
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
 pub struct UpdateItem {

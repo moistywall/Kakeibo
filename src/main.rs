@@ -99,6 +99,7 @@ mod test {
         response::Response,
         Json,
     };
+    use serde::de::Expected;
     use tower::ServiceExt;
 
     fn build_item_req_with_json(path: &str, method: Method, json_body: String) -> Request<Body> {
@@ -152,5 +153,25 @@ mod test {
         let res = create_app(repository).oneshot(req).await.unwrap();
         let item = res_to_item(res).await;
         assert_eq!(expected, item);
+    }
+
+    #[tokio::test]
+    async fn should_find_item() {
+        let expected = Item::new(
+            1,
+            "牛乳".to_string(),
+            124,
+            "2024-06-27".to_string(),
+            "ベルクス".to_string(),
+        );
+
+        let repository = ItemRepositoryForMemory::new();
+        repository.create(CreateItem::new("牛乳".to_string(), 124, "2024-06-27".to_string(), "ベルクス".to_string()));
+        let req = build_item_req_with_empty(Method::GET, "/items");
+        let res = create_app(repository).oneshot(req).await.unwrap();
+        let bytes = axum::body::to_bytes(res.into_body(), usize::MAX).await.unwrap();
+        let body: String = String::from_utf8(bytes.to_vec()).unwrap();
+        let item: Vec<Item> = serde_json::from_str(&body).expect(&format!("cannot convert Item instance. body {}", body));
+        assert_eq!(vec![expected], item);
     }
 }
