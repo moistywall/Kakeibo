@@ -48,7 +48,7 @@ fn create_app<T: ItemRepository>(item: T) -> Router {
         .route("/", get(root))
         .route("/items", post(create_item::<T>).get(all_item::<T>))
         .route(
-            "/items:id",
+            "/items/:id",
             get(find_item::<T>)
                 .delete(delete_item::<T>)
                 .patch(update_item::<T>),

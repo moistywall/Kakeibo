@@ -6,6 +6,7 @@ use std::{
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use anyhow::{Context, Ok};
+use validator::Validate;
 
 // 書き方要確認
 #[derive(Debug, Error)]
@@ -32,8 +33,10 @@ pub struct Item {
     store_name: String,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq, Validate)]
 pub struct CreateItem {
+    #[validate(length(min = 1, message = "Can not be empty"))]
+    #[validate(length(max = 100, message = "Over text length"))]
     name: String,
     price: i32,
     date: String,
@@ -48,8 +51,10 @@ impl CreateItem {
 }
 
 // 一部の情報のみが渡されることを想定し，id以外の値はOption
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq, Validate)]
 pub struct UpdateItem {
+    #[validate(length(min = 1, message = "Can not be empty"))]
+    #[validate(length(max = 100, message = "Over text length"))]
     name: Option<String>,
     price: Option<i32>,
     date: Option<String>,

@@ -1,11 +1,19 @@
-use axum::{extract::{Extension, Path}, http::StatusCode, response::IntoResponse, Json};
+use axum::{
+    async_trait,
+    extract::{Extension, FromRequest, Request, Path},
+    http::StatusCode,
+    response::IntoResponse,
+    BoxError, Json,
+};
+use serde::de::{value, DeserializeOwned};
 use std::sync::Arc;
+use validator::Validate;
 
 use crate::repositories::{CreateItem, ItemRepository, UpdateItem};
 
 pub async fn create_item<T: ItemRepository>(
     Extension(repository): Extension<Arc<T>>,
-    Json(payload): Json<CreateItem>,
+    ValidatedJson(payload): ValidatedJson<CreateItem>,
 ) -> impl IntoResponse {
     let item = repository.create(payload);
     (StatusCode::CREATED, Json(item))
@@ -15,28 +23,61 @@ pub async fn find_item<T: ItemRepository>(
     Path(id): Path<i32>,
     Extension(repository): Extension<Arc<T>>,
 ) -> Result<impl IntoResponse, StatusCode> {
-    todo!();
-    Ok(StatusCode::OK)  // 暫定OK
+    let item = repository.find(id).ok_or(StatusCode::NOT_FOUND)?;
+    Ok((StatusCode::OK, Json(item)))
 }
 
 pub async fn all_item<T: ItemRepository>(
     Extension(repository): Extension<Arc<T>>,
 ) -> impl IntoResponse {
-    todo!();        // 暫定OK
+    let item = repository.all();
+    (StatusCode::OK, Json(item))
 }
 
-pub async fn update_item<T: ItemRepository>(    // 引数の順番に注意，patchでエラーが出ることがある，理由要確認
-    Extension(repositoriry): Extension<Arc<T>>,
+pub async fn update_item<T: ItemRepository>(
+    // 引数の順番に注意，patchでエラーが出ることがある，理由要確認
+    Extension(repository): Extension<Arc<T>>,
     Path(id): Path<i32>,
-    Json(payload): Json<UpdateItem>,
+    ValidatedJson(payload): ValidatedJson<UpdateItem>,
 ) -> Result<impl IntoResponse, StatusCode> {
-    todo!();
-    Ok(StatusCode::OK)      // 暫定OK
+    let item = repository
+        .update(id, payload)
+        .or(Err(StatusCode::NOT_FOUND))?;
+    Ok((StatusCode::CREATED, Json(item)))
 }
 
 pub async fn delete_item<T: ItemRepository>(
     Path(id): Path<i32>,
     Extension(repository): Extension<Arc<T>>,
 ) -> StatusCode {
-    todo!();
+    repository
+        .delete(id)
+        .map(|_| StatusCode::NO_CONTENT)
+        .unwrap_or(StatusCode::NOT_FOUND)
+}
+
+#[derive(Debug)]
+pub struct ValidatedJson<T>(T);
+
+#[async_trait]
+impl<T, S> FromRequest<S> for ValidatedJson<T>
+where 
+    T: DeserializeOwned + Validate,
+    S: Send + Sync,
+{
+    type Rejection = (StatusCode, String);
+
+    async fn from_request(req: Request, state: &S) -> Result<Self, Self::Rejection> {
+        let Json(value) = Json::<T>::from_request(req, state)
+            .await
+            .map_err(|rejection| {
+                let message = format!("Json parse error: [{}]", rejection);
+                (StatusCode::BAD_REQUEST, message)
+            })?;
+        value.validate().map_err(|rejection| {
+            let message = format!("Validation error [{}]", rejection).replace('\n', ",");
+            (StatusCode::BAD_REQUEST, message)
+        })?;
+        Ok(ValidatedJson(value))
+    }
 }
