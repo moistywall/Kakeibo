@@ -1,6 +1,6 @@
 use axum::{
     async_trait,
-    extract::{Extension, FromRequest, Request, Path},
+    extract::{Extension, FromRequest, Path, Request},
     http::StatusCode,
     response::IntoResponse,
     BoxError, Json,
@@ -14,24 +14,27 @@ use crate::repositories::{CreateItem, ItemRepository, UpdateItem};
 pub async fn create_item<T: ItemRepository>(
     Extension(repository): Extension<Arc<T>>,
     ValidatedJson(payload): ValidatedJson<CreateItem>,
-) -> impl IntoResponse {
-    let item = repository.create(payload);
-    (StatusCode::CREATED, Json(item))
+) -> Result<impl IntoResponse, StatusCode> {
+    let item = repository
+        .create(payload)
+        .await
+        .or(Err(StatusCode::NOT_FOUND))?;
+    Ok((StatusCode::CREATED, Json(item)))
 }
 
 pub async fn find_item<T: ItemRepository>(
     Path(id): Path<i32>,
     Extension(repository): Extension<Arc<T>>,
 ) -> Result<impl IntoResponse, StatusCode> {
-    let item = repository.find(id).ok_or(StatusCode::NOT_FOUND)?;
+    let item = repository.find(id).await.or(Err(StatusCode::NOT_FOUND))?;
     Ok((StatusCode::OK, Json(item)))
 }
 
 pub async fn all_item<T: ItemRepository>(
     Extension(repository): Extension<Arc<T>>,
-) -> impl IntoResponse {
-    let item = repository.all();
-    (StatusCode::OK, Json(item))
+) -> Result<impl IntoResponse, StatusCode> {
+    let item = repository.all().await.unwrap();
+    Ok((StatusCode::OK, Json(item)))
 }
 
 pub async fn update_item<T: ItemRepository>(
@@ -42,6 +45,7 @@ pub async fn update_item<T: ItemRepository>(
 ) -> Result<impl IntoResponse, StatusCode> {
     let item = repository
         .update(id, payload)
+        .await
         .or(Err(StatusCode::NOT_FOUND))?;
     Ok((StatusCode::CREATED, Json(item)))
 }
@@ -52,6 +56,7 @@ pub async fn delete_item<T: ItemRepository>(
 ) -> StatusCode {
     repository
         .delete(id)
+        .await
         .map(|_| StatusCode::NO_CONTENT)
         .unwrap_or(StatusCode::NOT_FOUND)
 }
@@ -61,7 +66,7 @@ pub struct ValidatedJson<T>(T);
 
 #[async_trait]
 impl<T, S> FromRequest<S> for ValidatedJson<T>
-where 
+where
     T: DeserializeOwned + Validate,
     S: Send + Sync,
 {

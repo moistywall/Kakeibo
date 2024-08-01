@@ -1,7 +1,7 @@
 mod handlers;
 mod repositories;
 
-use crate::repositories::{ItemRepository, ItemRepositoryForMemory};
+use crate::repositories::{ItemRepository, ItemRepositoryForDb};
 use axum::{
     body::Bytes,
     extract::{Extension, MatchedPath},
@@ -10,8 +10,10 @@ use axum::{
     routing::{get, post},
     Router,
 };
+use dotenv::dotenv;
 use handlers::{all_item, create_item, delete_item, find_item, update_item};
-use std::{sync::Arc, time::Duration};
+use sqlx::PgPool;
+use std::{env, sync::Arc, time::Duration};
 use tokio::net::TcpListener;
 use tower_http::{classify::ServerErrorsFailureClass, trace::TraceLayer};
 use tracing::{info, info_span, Span};
@@ -26,8 +28,16 @@ async fn main() {
         )
         .with(tracing_subscriber::fmt::layer())
         .init();
+    dotenv().ok();
 
-    let repository = ItemRepositoryForMemory::new();
+    let database_url = &env::var("DATABASE_URL").expect("undefined [DATABASE_URL");
+    tracing::debug!("start connecting database...");
+    let pool = PgPool::connect(database_url)
+        .await
+        .expect(&format!("fail connect database, url is [{}]", database_url));
+
+    let repository = ItemRepositoryForDb::new(pool.clone());
+
     // ルーティングを作成,どのパスでどのサービスへたどり着くかを設定する
     // getで受ける関数は最低限ブラウザで処理可能なテキスト(str?)をを返していればok
     // ルートがない場合は404を返す
@@ -92,13 +102,14 @@ fn create_app<T: ItemRepository>(item: T) -> Router {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::repositories::{CreateItem, Item};
+    use crate::repositories::{test_utils::ItemRepositoryForMemory, CreateItem};
     use axum::{
         body::Body,
         http::{header, Method, Request, StatusCode},
         response::Response,
         Json,
     };
+    use repositories::Item;
     use serde::de::Expected;
     use tower::ServiceExt;
 
@@ -148,7 +159,8 @@ mod test {
                 "price": "124",
                 "date": "2024-06-27",
                 "store": "ベルクス",
-            }"#.to_string(),
+            }"#
+            .to_string(),
         );
         let res = create_app(repository).oneshot(req).await.unwrap();
         let item = res_to_item(res).await;
@@ -166,12 +178,20 @@ mod test {
         );
 
         let repository = ItemRepositoryForMemory::new();
-        repository.create(CreateItem::new("牛乳".to_string(), 124, "2024-06-27".to_string(), "ベルクス".to_string()));
+        repository.create(CreateItem::new(
+            "牛乳".to_string(),
+            124,
+            "2024-06-27".to_string(),
+            "ベルクス".to_string(),
+        ));
         let req = build_item_req_with_empty(Method::GET, "/items");
         let res = create_app(repository).oneshot(req).await.unwrap();
-        let bytes = axum::body::to_bytes(res.into_body(), usize::MAX).await.unwrap();
+        let bytes = axum::body::to_bytes(res.into_body(), usize::MAX)
+            .await
+            .unwrap();
         let body: String = String::from_utf8(bytes.to_vec()).unwrap();
-        let item: Vec<Item> = serde_json::from_str(&body).expect(&format!("cannot convert Item instance. body {}", body));
+        let item: Vec<Item> = serde_json::from_str(&body)
+            .expect(&format!("cannot convert Item instance. body {}", body));
         assert_eq!(vec![expected], item);
     }
 }
